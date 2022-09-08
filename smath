@@ -1,0 +1,622 @@
+# -*- coding: utf-8 -*-
+"""
+函数说明：此为旋转球极坐标系下的数学计算函数
+作者：聂贻孝
+版本：V1.0
+日期: 2022-6-6
+"""
+
+import math,CSPC,RSPC
+
+class Point_SPC:
+    '''
+    Point_SPC类是一个以旋转球极坐标表示的类，
+    主要用三角学理论和空间四面体线角公式对点的方位坐标进行计算。
+    下面定义旋转球极坐标的+，-，*，/，>>,**六种基本运算规则。
+    '''
+    def __init__(self,x,y,sg=0):
+        self.x=x
+        self.y=y
+        self.sg=sg
+    
+    def Cal_TSA(self,Dpa,Omg_1,Omg_2):
+        '''
+        根据四面体空间角的基本公式进行计算。
+        令单位球球心为O，零极轴与球面交点为A，第一个球面上点B，第二个球面上点C，那么：
+        二面角B-OA-C的平面角A,二面角A-OB-C的平面角B,二面角A-OC-B的平面角C。
+        Alpha_A=∠BOC=α,Beta_B=∠AOC=β,Gama_C=∠AOB=γ
+        A=Eps_A,B=B_pa,C=C_pa，返回∠BOC，平面角B，平面角C
+        '''
+        Gama_C=math.fabs(Omg_1)
+        Beta_B=math.fabs(Omg_2)
+        Eps_A=math.fabs(Dpa)
+        #下面计算α的值
+        Tv=math.cos(Gama_C)*math.cos(Beta_B)+math.sin(Gama_C)*math.sin(Beta_B)*math.cos(Eps_A)
+        Alpha_A=math.acos(Tv)
+        
+        #下面计算二面角A-OB-C的平面角B的值
+        tv1=(math.cos(Beta_B)-math.cos(Alpha_A)*math.cos(Gama_C))/(math.sin(Alpha_A)*math.sin(Gama_C))
+        B_pa=math.acos(tv1)
+        
+        #下面计算二面角A-OC-B的平面角C的值
+        tv2=(math.cos(Gama_C)-math.cos(Alpha_A)*math.cos(Beta_B))/(math.sin(Alpha_A)*math.sin(Beta_B))
+        C_pa=math.acos(tv2)
+        return Alpha_A,B_pa,C_pa  #返回(α,B,C)
+        
+
+    def Allcoord_invento_Rotcoord(self,other):
+        '''
+        输入两个点坐标，输入点坐标可以是经纬度角坐标或两仪面角坐标，
+        此函数是将输入两个任意点方位坐标转化成对应主值范围内的两仪面角坐标
+        返回两个点的两仪面角坐标的主值[Arg_ε,Arg_ω]。
+        '''
+        if self.sg==0:
+            if other.sg==0:
+                #两点均为经纬度角坐标
+                Original_point=([self.x,self.y],0)
+                Other_point=([other.x,other.y],0)
+                X=CSPC.Create(Original_point)
+                Y=CSPC.Create(Other_point)
+            elif other.sg==1:
+                #第一个点为经纬度角坐标，第二个点为两仪面角坐标
+                Original_point=([self.x,self.y],0)
+                X=CSPC.Create(Original_point)
+                Other_point=([other.x,other.y],1)
+                Y=RSPC.LiangYi_Create(Other_point)
+            else:#类型标识符为其它值无效
+                raise ValueError('球极坐标矢量最后标识位输入错误！')
+                X=[math.nan,math.nan]
+                Y=[math.nan,math.nan]
+        elif self.sg==1:
+            if other.sg==1:
+                #输入都为两仪面角坐标
+                Original_point=([self.x,self.y],1)
+                Other_point=([other.x,other.y],1)
+                X=RSPC.LiangYi_Create(Original_point)
+                Y=RSPC.LiangYi_Create(Other_point)
+                
+            elif other.sg==0:
+            #第一个点为两仪面角坐标，第二个点为经纬度角坐标
+                Original_point=([self.x,self.y],1)
+                X=RSPC.LiangYi_Create(Original_point)
+                
+                Other_point=([other.x,other.y],0)
+                Y=CSPC.Create(Other_point)
+
+            else: #类型标识符为其它值无效
+                raise ValueError('球极坐标矢量最后标识位输入错误！')
+                X=[math.nan,math.nan]
+                Y=[math.nan,math.nan]
+        else: #self.sg标识数值输入错误
+            X=[math.nan,math.nan]
+            Y=[math.nan,math.nan]
+            raise ValueError('球极坐标矢量最后标识位输入错误！')
+            
+        return list(X),list(Y) #返回两点两仪面角坐标主值
+
+    def __add__(self, other):   #加法运算
+        '''
+        此为球心夹角的矢量加法运算，由球心与起始点连线，扫过γ角度到达终点与球心连线。
+        返回值γ角(弧度)，γ∈（-π，π），起始点两仪面角坐标主值[ε,ω]，终点两仪面角坐标主值[ε',ω']
+        '''
+        if not isinstance(other, Point_SPC):
+            raise ValueError('错误：实例other必须属于Point_SPC类')
+        else:
+            Z=self.Allcoord_invento_Rotcoord(other)
+            #Z[0]为[ε1,ω1],Z[1]为[ε2,ω2]
+            
+            '''
+            令球心为O，零极点为A，第一个点B，第二个点C
+            下面计算二面角B-OA-C的平面角大小
+            '''
+            Sg_E=1   #判断ε1与ε2是否同号，即方向相同
+            math.copysign(Sg_E, Z[0][0]*Z[1][0])
+            Sg_W=1   #判断ω1与ω2是否同号，即方向相同
+            math.copysign(Sg_W, Z[0][1]*Z[1][1])
+            if Sg_E==1:
+                if Sg_W==1:
+                    A_Da=math.fabs(Z[0][0]-Z[1][0])
+                elif Sg_W==-1:
+                    A_Da=math.pi-math.fabs(Z[0][0]-Z[1][0])
+                else:
+                    pass
+            elif Sg_E==-1:
+                if Sg_W==1:
+                    A_Da=math.fabs(Z[0][0])+math.fabs(Z[1][0])
+                elif Sg_W==-1:
+                    A_Da=math.pi-(math.fabs(Z[0][0])+math.fabs(Z[1][0]))
+                else:
+                    pass
+            else:
+                pass
+            
+            #下面对四面体的空间角进行计算
+            Tsa=self.Cal_TSA(A_Da,Z[0][1],Z[1][1])
+
+            #下面对上面计算结果列表第二个数处插入二面角的平面角A
+            Tsa_add=list(Tsa)
+            Tsa_add.insert(1, math.fabs(A_Da))  #变成(α,ε_A,ε_B,ε_C)列表，后3位为二面角的平面角
+                
+        return Z,Tsa_add  #返回([ε1,ω1],[ε2,ω2]),[α,ε_A,ε_B,ε_C]
+
+    def __sub__(self, other):    #减法运算
+        if not isinstance(other, Point_SPC):
+            raise ValueError('实例other必须属于Point_SPC类')
+        else:
+            Z=self.Allcoord_invento_Rotcoord(other)
+            #Z[0]为[ε1,ω1],Z[1]为[ε2,ω2]
+            '''
+            令球心为O，零极点为A，第一个点B，第二个点C
+            下面计算二面角B-OA-C的平面角大小
+            '''
+            Sg_E=1   #判断ε1与ε2是否同号，即方向相同
+            math.copysign(Sg_E,Z[0][0]*Z[1][0])
+            Sg_W=1   #判断ω1与ω2是否同号，即方向相同
+            math.copysign(Sg_W,Z[0][1]*Z[1][1])
+            if Sg_E==-1:
+                if Sg_W==-1:
+                    A_Da=math.fabs(Z[0][0])+math.fabs(Z[1][0])
+                elif Sg_W==1:
+                    A_Da=math.pi-(math.fabs(Z[0][0])+math.fabs(Z[1][0]))
+                else:
+                    pass
+            elif Sg_E==1:
+                if Sg_W==1:
+                    A_Da=math.pi-math.fabs(Z[0][0]-Z[1][0])
+                elif Sg_W==-1:
+                    A_Da=math.fabs(Z[0][0]-Z[1][0])
+            else:
+                pass
+
+        #下面对四面体的空间角进行计算
+        Tsa=self.Cal_TSA(A_Da,Z[0][1],Z[1][1])
+        
+        #下面对上面计算结果列表第二个数处插入二面角的平面角A
+        Tsa_add=list(Tsa)
+        Tsa_add.insert(1, math.fabs(A_Da))  #变成(α,ε_A,ε_B,ε_C)列表，后3位为二面角的平面角
+
+        return Z,Tsa_add   #返回([ε1,ω1],[ε2,ω2]),[α,ε_A,ε_B,ε_C]
+    
+    def __mul__(self, other):   #乘法运算
+        '''
+        输入两个旋转球极坐标，其几何意义是第一个点沿正的方向变换
+        第二点两仪面角坐标[ε2,ω2]所得到新的点两仪面角坐标[ε',ω']
+        '''
+        if not isinstance(other, Point_SPC):
+            raise ValueError('实例other必须属于Point_SPC类')
+        else:
+            Z=self.Allcoord_invento_Rotcoord(other)
+            #Z[0]为[ε1,ω1],Z[1]为[ε2,ω2]
+            Eps_mul=Z[0][0]+Z[1][0]
+            Omg_mul=Z[0][1]+Z[1][1]
+            
+            #下面是ε,ω有序数偶配对计算
+            if -math.pi < Eps_mul <= math.pi:
+                if -math.pi/2 < Eps_mul <= math.pi/2:
+                    Omg_w=Omg_mul
+                else:
+                    Omg_w=-Omg_mul
+                #下面对有序数偶[ε',ω']等价转化
+                Pos_wcs=([Eps_mul,Omg_w],1)
+                Q=RSPC.LiangYi_Create(Pos_wcs)  #将ε',ω'等价转换到主值范围内
+            else:
+                Q=[math.nan,math.nan]
+                raise ValueError("ε值非法，超出(-π，π]的范围！")
+        #返回对应ε,ω的等价主值有序对
+        return Q
+
+    def __truediv__(self, other):    #除法运算
+        '''
+        输入两个旋转球极坐标，其几何意义是第一个点沿负的方向变换
+        第二点：[ε,ω]所得到新的点两仪面角坐标[ε',ω']
+        '''
+        if not isinstance(other, Point_SPC):
+            raise ValueError('实例other必须属于Point_SPC类')
+        else:
+            Z=self.Allcoord_invento_Rotcoord(other)
+            #Z[0]为[ε1,ω1],Z[1]为[ε2,ω2]
+            Eps_div=Z[0][0]-Z[1][0]
+            Omg_div=Z[0][1]-Z[1][1]
+            #下面是ε,ω有序数偶配对计算
+            if -math.pi < Eps_div <= math.pi:
+                if -math.pi/2 < Eps_div <= math.pi/2:
+                    Omg_w=Omg_div
+                else:
+                    Omg_w=-Omg_div
+                #下面对有序数偶[ε',ω']等价转化
+                Pos_wcs=([Eps_div,Omg_w],1)
+                Q=RSPC.LiangYi_Create(Pos_wcs)  #将ε',ω'等价转换到主值范围内
+            else:
+                Q=[math.nan,math.nan]
+                raise ValueError("ε值非法，超出(-π，π]的范围！")
+        #返回对应ε,ω的等价主值有序对
+        return Q
+
+    def __rshift__(self,other): #从点1到点2的变换关系 
+        '''
+        此函数几何意义方位旋转变换(从点1到点2) 操作符">>"
+        输入两个点旋转球极坐标，由点1(self)变到点2(other)的方位。
+        返回值(相对量)：∆ε(太极面阳半侧转角变化量)，∆ω(两仪面上零极轴转角变化量)
+        '''
+        if not isinstance(other, Point_SPC):
+            raise ValueError('错误：实例other必须属于Point_SPC类')
+        else:
+            Z=self.Allcoord_invento_Rotcoord(other)
+            #返回值Z[0]为[ε1,ω1],Z[1]为[ε2,ω2]
+            det_Eps=Z[1][0]-Z[0][0]  #此值代表两仪面阳侧所转过角度
+            det_Omega=Z[1][1]-Z[0][1] #ω的变化量
+            
+        #下面对∆ω值进行整理
+        det_Omega=RSPC.Coord_Trans_Omega(det_Omega)  #点1在两仪面上以最小绝对角度值转到点2的方位
+        return det_Eps,det_Omega  #返回∆ε，∆ω值
+    
+    def __pow__(self,other): #用户坐标系中点在原世界坐标系中坐标
+        '''
+        此函数几何意义为：新零极轴与世界坐标系中零极轴构成一个新的太极面，
+        此新的用户坐标系中点映射在原世界坐标系中的两仪面角坐标。
+        即点在用户坐标系与原世界坐标系之间的映射关系。
+        输入值：self为用户坐标系中的新零极轴在原世界坐标系中的方位坐标；
+        输入值：other为点在用户坐标系中的方位坐标。
+        返回值:other点在世界坐标系中的两仪面角坐标主值。
+        '''
+        if not isinstance(other, Point_SPC):
+            raise ValueError('实例other必须属于Point_SPC类')
+        else:
+            Z=self.Allcoord_invento_Rotcoord(other)
+            #返回值Z[0]为[ε1,ω1],Z[1]为[ε2,ω2]
+            '''O为单位球的球心，A为世界坐标系的零极轴与单位球面的交点，B为用户坐标系中零极轴与球面交点
+            C为另一不与O,A,B重合的点，以下所有类同。
+            在四面体O-ABC中,cos∠AOC=cos∠AOBcos∠BOC+sin∠AOBsin∠BOCcosB 
+            B为A-OB-C二面角的平面角,∠AOB=ω1，∠BOC=ω2，B=π-ε2，求∠AOC
+            '''
+            if Z[0][1] !=0.0: #ω1不为零
+                _AOB=math.fabs(Z[0][1]) #ω1
+                _BOC=math.fabs(Z[1][1]) #ω2
+                B_pa=Z[1][0]#ε2
+                tv=math.cos(_AOB)*math.cos(_BOC)-math.sin(_AOB)*math.sin(_BOC)*math.cos(B_pa)
+                _AOC=math.acos(tv)  #点与球心连线与原世界坐标系零极轴之间夹角
+                '''在四面体O-ABC中,cos∠BOC=cos∠AOBcos∠AOC+sin∠AOBsin∠AOCcosA 
+                A为B-OA-C二面角的平面角,∠AOB=ω1，∠BOC=ω2,求A
+                '''
+                Tf=math.cos(_BOC)-math.cos(_AOB)*math.cos(math.fabs(_AOC))  #Tf表示分子部分
+                Bf=math.sin(math.fabs(_AOB))*math.sin(math.fabs(_AOC))  #Tf表示分母部分
+                A_pa=math.copysign(math.acos(Tf/Bf), Z[1][0]*Z[1][1]) #∆ε符号由ε2*ω2的值正负决定
+                Eps_w=Z[0][0]+A_pa  #Eps_w∈（-π，π]
+                #下面是ε,ω有序数偶配对计算
+                if -math.pi < Eps_w <= math.pi:
+                    if -math.pi/2 < Eps_w <= math.pi/2:  #Eps_w∈(-π/2，π/2],∠AOC的值保持原值
+                        Omg_w=_AOC
+                    else:
+                        #Eps_w∈(-π，-π/2]&(π/2,π],∠AOC的值要变号
+                        Omg_w=-_AOC
+                    Pos_wcs=[Eps_w,Omg_w,1]  #other点的方位坐标变成[ε,ω,1]形式进行运算
+                    Q=RSPC.LiangYi_Create(Pos_wcs) #将other点的ε,ω等价转换到主值范围内
+                else:
+                    Q=[math.nan,math.nan]
+                    raise ValueError("ε值非法，超出(-π，π]的范围！")
+            else:  #ω1为零
+                Q=[math.nan,math.nan]
+                raise ValueError("用户坐标系与原世界坐标系的零极轴不能重合！")
+        return Q  #返回other点在世界坐标系中的两仪面角坐标
+
+class ConvertCoord:
+    '''
+    此类的作用主要是处理坐标系的转换。
+    '''
+    def __init__(self,x,y,sg,d=1.0):
+        self.xx=x
+        self.yy=y
+        self.ssg=sg
+        self.rr=d
+ 
+    def Translate_wcs2ucs(self):
+        '''
+        此函数为旋转球极坐标系的平移变换,反映用户坐标系与世界坐标系之间的平移映射关系。
+        输入值为用户坐标系的球心在世界坐标系中的坐标。
+        返回值:[用户坐标系相对于世界坐标系的平移映射],[零极轴两仪面角坐标]，[正极轴两仪面角坐标]
+        '''
+        if self.ssg==0:  #前3位输入值为[θ,ψ,0]形式
+            ubc=[self.xx,self.yy,1.0]
+            Z=CSPC.Create(ubc)
+            #下面返回用户坐标系的球心相对于世界坐标系的方位坐标：两仪面角坐标，沿方位坐标方向上平移距离
+            ucs_inT_wcs=[Z[0],Z[1],self.rr]
+            #下面计算世界坐标系球心相对于此用户坐标系的方位坐标：两仪面角坐标，沿方位坐标方向上平移距离
+            self.Omg=Z[1]-math.pi
+
+        elif self.ssg==1: #前3位输入值为[ε,ω,1]形式
+            ucs_inT_wcs=[self.xx,self.yy,self.rr]
+        else:
+            raise ValueError("数据类型输入错误！只能输入([θ,ψ],0)或([ε,ω],1)形式数据。")
+            ucs_inT_wcs=math.nan
+
+        #返回值[用户坐标系相对于参考坐标系的平移映射],[零极轴两仪面角坐标]，[正极轴两仪面角坐标]
+        return ucs_inT_wcs
+    
+        
+    def Rotate_wcs2ucs(self):
+        '''
+        由正极轴矢量来求用户坐标系的太极面矢量，ppa表示已知正极轴
+        pos_w为世界坐标系中的正极轴单位球面上点坐标,可以是经纬角坐标[arg_θ,arg_ψ,0]，
+        取值范围：arg_θ∈(-π,π],arg_ψ∈[-π/2,π/2]
+        也可以是两仪面角坐标[Arg_ε,Arg_ω,1]，两种列表最后一位是坐标分类号
+        取值范围：Arg_ε∈（-π/2,π/2]，Arg_ω∈(-π,π]
+        新用户坐标系相对于原世界坐标系最多2次旋转得到，旋转步骤如下：
+        世界坐标系绕零极轴旋转一次得到一两仪面，两仪面与θ=π/2的单位圆交于B点，
+        然后以两仪面为新太极面，以OB为新零极轴旋转得到最终用户坐标系。
+        返回第一个两仪面转角，第二个两仪面转角,存在Da列表里
+        返回3个列表的数组
+        [用户坐标系旋转转换参数]，[零极轴两仪面角坐标],[正极轴两仪面角坐标]
+        '''
+        Da=[0.0,0.0]  #初始值为0，即没有旋转
+        # Da[0]表示第一个两仪面转角，Da[1]表示以第一两仪面作为太极面，以θ=π/2为零极轴所转过角度.
+        ZPa=[0.0,0.0]   #零极轴两仪面角坐标的初始值
+        PPa=[math.pi/2,math.pi/2] #正极轴的两仪面角坐标的初始值
+        pcs_w=list(self.xx,self.yy,self.ssg)
+        pcs_w.insert(2, 1.0)  #把输入参数第三个位置插入r=1,变成[xx,xx,1.0,xx]
+        ''''
+        #为pcs_w二面角的平面角正负标志
+        二面角的平面角    ε=0-->Sg_D=0,ε=π/2-->Sg_D=2,
+                       0<ε<π/2-->Sg_D=1,-π/2<ε<0-->Sg_D=-1
+        '''
+        if pcs_w[-1]==0: #采用方位坐标(θ,ψ,0)形式
+            if math.isclose(pcs_w[0]==0.0 and pcs_w[1],math.pi/2,rel_tol=1e-10) :
+            #为世界坐标系正极轴或负极轴
+                #下面正极轴的两仪面角坐标
+                Da[0],Da[1]=0.0,0.0
+                PPa[0]=math.pi/2
+                PPa[1]=math.pi/2
+            elif pcs_w[0]==0.0 and math.isclose(pcs_w[1],-math.pi/2,rel_tol=1e-10):
+                #为世界坐标系负极轴
+                Da[0],Da[1]=math.pi,0.0
+                PPa[0]=math.pi/2
+                PPa[1]=-math.pi/2
+            elif pcs_w[1]==0: #正极轴在太极面上
+                Da[0]=math.pi/2
+                Da[1]=pcs_w[0]+math.pi/2  #第一次绕零极轴转π/2后，正极轴在(-π/2,0)方位
+
+                X=CSPC.Create(pcs_w)
+                PPa[0]=X[0]
+                PPa[1]=X[1]
+            else:
+                pcs_w.pop()  #移除列表最后一个值，变成[xx,xx,1.0]格式
+                X=CSPC.Create(pcs_w)
+                #其中取值范围X[0]∈(-π/2，π/2],X[1]∈[0,π) X[1]值范围是因为限定新零极轴ω角为正值
+                Da[0]=X[0]-math.pi/2
+                Da[0]=RSPC.Coord_Trans_Epslon(Da[0])  #将ε值等效转化到主值范围(-π/2,π/2]
+                '''
+                两仪面与θ=π/2的单位圆交于B点，B点两仪面角坐标（ε-π/2，π/2）
+                然后以OB为新零极轴，两仪面为新太极面
+                下面以新太极面和新的零极轴进行旋转
+                '''
+                Da[1]=math.fabs(math.pi/2-math.fabs(X[1]))
+                #下面对Da[1]结果的符号进行判断(正负号)
+                if math.isclose(math.fabs(X[1]),math.pi/2,rel_tol=1e-10):
+                    Da[1]=0.0
+                elif math.fabs(X[1])>math.pi/2:
+                    #Da[1]与X[1]符号一致
+                    Da[1]=math.copysign(Da[1], X[1])
+                elif math.fabs(X[1])<math.pi/2:
+                    #Da[1]与X[1]符号相反
+                    Da[1]=math.copysign(Da[1], -X[1])
+
+                #下面得到正极轴的两仪面角坐标
+                PPa[0]=X[0]
+                PPa[1]=X[1]
+                
+        elif pcs_w[-1]==1:   #采用两仪面角坐标(ε,ω,1)形式
+            if math.isclose(pcs_w[0],math.pi/2,rel_tol=1e-10) and math.isclose(pcs_w[1],math.pi/2,rel_tol=1e-10):
+                #为世界坐标系正极轴或负极轴
+                Da[0],Da[1]=0.0,0.0
+                PPa[0]=math.pi/2
+                PPa[1]=math.pi/2
+            elif math.isclose(pcs_w[0],math.pi/2,rel_tol=1e-10) and math.isclose(pcs_w[1],-math.pi/2,rel_tol=1e-10):
+                #为世界坐标系负极轴
+                Da[0],Da[1]=math.pi,0.0
+                PPa[0]=math.pi/2
+                PPa[1]=-math.pi/2
+            elif math.isclose(pcs_w[0],0.0,rel_tol=1e-10): #正极轴在太极面上
+                Da[0]=math.pi/2
+                Da[1]=pcs_w[1]+math.pi/2  #第一次绕零极轴转π/2后，正极轴在(-π/2,0)方位
+                
+                PPa=[pcs_w[0],pcs_w[1]]
+            else:
+                Da[0]=pcs_w[0]-math.pi/2
+                '''
+                两仪面与θ=π/2的单位圆交于B点，B点两仪面角坐标（ε-π/2，π/2）
+                然后以OB为新零极轴，两仪面为新太极面
+                下面以新太极面和新的零极轴进行旋转
+                '''
+                Da[1]=math.fabs(math.pi/2-math.fabs(pcs_w[1]))
+                if math.isclose(math.fabs(pcs_w[1]),math.pi/2,rel_tol=1e-10):
+                    Da[1]=0.0
+                elif math.fabs(pcs_w[1])>math.pi/2:
+                    #Da[1]与X[1]符号一致
+                    Da[1]=math.copysign(Da[1], pcs_w[1])
+                elif math.fabs(pcs_w[1])<math.pi/2:
+                    #Da[1]与X[1]符号相反
+                    Da[1]=math.copysign(Da[1], -pcs_w[1])
+                
+                #下面为正极轴的两仪面角坐标
+                PPa[0]=pcs_w[0]
+                PPa[1]=pcs_w[1]
+
+        else:
+            raise ValueError("数据类型输入错误！只能输入[θ,ψ,0]或[ε,ω,1]形式数据。")
+        '''
+        下面计算零极轴两仪面角坐标
+        '''
+        if pcs_w[-1]==0:  #采用方位坐标(θ,ψ,0)形式
+            if pcs_w[0]==0 and math.isclose(pcs_w[1],math.pi/2,rel_tol=1e-10):
+                ZPa=[0.0,0.0]  #正极轴方位坐标为[0,π/2]时，零极轴不变
+            else:  #下面结果以两仪面角坐标表示
+                ZPa[0]=Da[0]
+                ZPa[1]=math.pi/2
+        else:  #采用两仪面角坐标(ε,ω,1)形式
+            if math.isclose(pcs_w[0],math.pi/2,rel_tol=1e-10) and math.isclose(pcs_w[1],math.pi/2,rel_tol=1e-10):
+                ZPa=[0.0,0.0]  #正极轴两仪面角坐标为[π/2,π/2]时，零极轴不变
+            else:
+                ZPa[0]=Da[0]
+                ZPa[1]=math.pi/2
+    
+        return Da,ZPa,PPa  #1-用户球极坐标系旋转参数，2-新零极轴两仪面角坐标，3-新正极轴两仪面角坐标
+
+    def Rotate2_wcs2ucs(self,other):
+        '''
+        已知新用户坐标系的太极面和零极轴求正极轴的方位坐标。
+        用户坐标系中的太极面由新零极轴和other点构成的平面。
+        输入值：self为用户坐标系中的零极轴在原世界坐标系中的方位坐标；
+        输入值：other为另外点在用户坐标系中的方位坐标。
+        返回3个列表的数组
+        [用户坐标系旋转转换参数]，[零极轴两仪面角坐标],[正极轴两仪面角坐标]
+        '''
+        if not isinstance(other, Point_SPC):
+            raise ValueError('实例other必须属于Point_SPC类')
+        else:
+            Z=self.Allcoord_invento_Rotcoord(other)
+            #返回值Z[0]为[ε1,ω1],Z[1]为[ε2,ω2]
+            '''O为单位球的球心，A为世界坐标系的零极轴与单位球面的交点，B为用户坐标系中零极轴与球面交点
+            C为另一不与O,A,B重合的点，D为用户坐标系的正极轴与单位球面交点，以下所有类同。
+            在四面体O-ABD中，cos∠AOD=cos∠AOBcos∠BOD+sin∠AOBsin∠BODcosB 
+            B为A-OB-D二面角的平面角,∠AOB=ω1，∠BOD=π/2，B=π/2-ε2，求∠AOD
+            cos∠AOD=sin∠AOBsin(ε2)
+            '''
+            Da=[Z[0][0],Z[1][0]]  #用户坐标系的太极面相对原世界坐标系的太极面依次绕两零极轴旋转角度
+            Zpa=[Z[0][0],Z[0][1]]  #用户坐标系的零极轴在原世界坐标系中的方位坐标
+            if Z[0][1]!=0.0:
+                _AOB=math.fabs(Z[0][1])   #∠AOB=ω1
+                Eps_u=math.fabs(Z[1][0])  #Eps_u表示用户坐标系中的ε2值
+                tv1=math.sin(_AOB)*math.sin(Eps_u)
+                _AOD=math.acos(tv1) #此为∠AOD的值(弧度)
+                
+                '''在四面体O-ABD中，cos∠BOD=cos∠AOBcos∠AOD+sin∠AOBsin∠AODcosA 
+                A为B-OA-D二面角的平面角,∠AOB,∠AOD值如上面所示，求平面角A的值
+                '''
+                tv2=-math.cos(_AOB)*math.sin(Eps_u)/math.sin(_AOD)
+                A_pa=math.acos(tv2)
+                Eps_w=Z[0][0]+math.fabs(A_pa)  #正极轴的两仪面角坐标之ε值
+                Pos_wcs=[Eps_w,_AOD,1]  #变成[ε,ω,1]形式数组进行下步运算
+                Ppa=RSPC.LiangYi_Create(Pos_wcs) #将正极轴的ε,ω等价转换到主值范围内
+                
+            else: #ω1=0，正极轴有无穷多种值.
+                Ppa=[math.nan,math.nan]
+                raise ValueError("用户坐标系与原世界坐标系的零极轴不能重合！")
+        return Da,Zpa,Ppa #1-用户球极坐标系旋转参数，2-新零极轴两仪面角坐标，3-新正极轴两仪面角坐标
+    
+def Trunc_Dec_Digit(List_in,dc=6):
+    '''
+    此函数作用是将元组或列表中所有数值小数点位只保留指定位显示。
+    输入值：List_in为要处理对象，可以为单个整数或单个浮点数，数值元组或者数值列表。
+    返回值：返回值跟原输入值形式一致，只不过所有数值的小数位只保留指定位数。
+    '''
+    
+    #下面对单个浮点数处理
+    if isinstance(List_in,(int,float)):
+        List_out=[]
+        List_out.append(List_in)
+        A=List_Judg(List_in)
+        Trunc_float(List_out,A[1],dc)
+
+    #下面对元组或列表数组处理
+    elif isinstance(List_in,(tuple,list)):#第一层如果为元组或列表
+        List_out=list(List_in)
+        for j_out in range(len(List_out)):
+            A=List_Judg(List_in)
+            if isinstance(List_in[j_out],(tuple,list)):#第二层元素如果为元组或列表
+                for i_sec in range(len(List_out[j_out])):
+                    B=List_Judg(List_out[j_out])
+                    if isinstance(List_in[j_out][i_sec],list):#第三层元素列表
+                        C=List_Judg(List_out[j_out][i_sec])
+                        Trunc_float(List_out[j_out][i_sec],C[1],dc)
+                    else:
+                        Trunc_float(List_out[j_out],B[1],dc)
+            else:
+                Trunc_float(List_out,A[1],dc)
+
+    else:
+        raise ValueError("类型错误：输入值必须是浮点数或元组列表！")
+        
+    return List_out
+
+def List_Judg(List_in):
+    '''
+    输入值: List_in为需要判断的对象，可以为单个整数或单个浮点数，数值元组或数值列表.
+    返回值:列表1【列表元素其下标序列组成的列表】，列表2【数字元素其下标序列组成的列表】
+    '''
+    if isinstance(List_in,(tuple,list)):
+        List_out=list(List_in)
+        list_true=[]
+        for i in range(len(List_out)):
+            if isinstance(List_out[i],(tuple,list)):#当List_out[i]为元组或列表，将i_n1值放在list_true列表里
+                list_true.append(i)   #记录列表元素序列号
+         #记录非列表元素
+        ST=set(range(len(List_out)))
+        list_false=ST.difference(set(list_true))   
+        list_false=list(list_false)   #非列表元素（即数字）的序列号列表
+    elif isinstance(List_in,(int,float)):
+        list_true=[]
+        list_false=[0]
+    else:
+        raise ValueError("数值类型输入错误，必须为实数、实数元组和实数列表！")
+    #下面返回列表元素其下标序列组成的列表，数字元素其下标序列组成的列表
+    return list_true,list_false
+
+    
+def Trunc_float(List_out,list_false,dc):
+    '''
+    输入参数: List_out表示要处理的元组或列表;
+    list_false表示List_out中为数字的项所对应的下标序号列表;
+    dc表示小数点后面要显示的位数。
+    返回值为原输入列表，只不过所有数值保留的小数位为给定值dc。
+    '''
+    for k in list_false:  #不是列表元素,即为数字
+        if math.isclose(List_out[k],0.0,rel_tol=1e-10):
+            List_out[k]=0.0
+        else:
+            List_out[k]=round(List_out[k],dc)#先按指定小数位4舍5入计算
+            #下面截取指定小数位显示
+            Str_x=str(List_out[k])
+            f=Str_x.index('.')+dc+1  #截止位
+            Str_y=Str_x[0]
+            for x1 in range(1,f):
+                Str_y=Str_y+Str_x[x1]
+            List_out[k]=float(Str_y)
+    return List_out
+
+def Convert_rspc2cspc(LY_cs):
+    '''
+    此函数作用是将两仪面角坐标等效转换为经纬度角坐标
+    输入参数：LY_cs两仪面角坐标的有序数组[ε,ω,1] :Epslon,Omega
+    返回值：经纬度角坐标的主值[arg_θ,arg_ψ] :Theta,Psi
+    '''
+    '''
+    设球心为O,零极轴与球面交点为A，所求点B位于球面上。B作垂直于OA直线交于N，
+    B点作垂直于太极面的交点为B'.那么可得：
+    ∠AOB=ω,∠BNB'=ε  ---->>∠AOB'=θ,∠BOB'=ψ  (程序中B'用b代替)
+    '''
+    #------下面先把两仪面角坐标等价转化到其对应的主值范围值-------
+    Lyc=RSPC.LiangYi_Create(LY_cs)
+    Epslon=Lyc[0]#ε主值
+    Omega=Lyc[1] #ω主值
+    #----------------------------------------------------------
+    if math.isclose(Epslon,0.0,rel_tol=1e-10):#当ε=0.0情况
+        Theta=Omega
+        Psi=0.0
+    else:  #当ε不等于0.0情况
+        #下面求∠BOB'=ψ。sin∠BOB'=BB'/OB=sin∠AOB*sin∠BNB'
+        _BOb=math.asin(math.sin(Omega)*math.sin(Epslon))
+        Psi=_BOb
+        
+        '''
+        下面求∠AOB'=θ，应用atan2(y,x)函数来求，其中ON=x,NB'=y,那么x=ON=OB*cos∠AOB=R*cosω,
+        y=NB'=BN*cos∠BNB'=R*sinωcosε,∠AOB'=atan2(NB',ON)
+        '''
+        _AOb=math.atan2(math.sin(Omega)*math.cos(Epslon),math.cos(Omega))
+        Theta=_AOb
+        
+        #下面对结果符号进行再赋值
+        if Epslon>0:
+            Psi=math.copysign(Psi, Omega)
+        else:
+            Psi=math.copysign(Psi, -Omega)
+        Theta=math.copysign(Theta, Omega)
+    return Theta,Psi
