@@ -1,0 +1,241 @@
+# -*- coding: utf-8 -*-
+"""
+函数说明：此为经纬度角坐标转换函数集(旋转球极坐标系)
+作者：聂贻孝
+版本：V1.1
+日期: 2022-9-4
+"""
+import math,cmath
+import smath
+
+class Complex_SPC:
+    '''下面定义内部变量的初始属性'''
+    Da=0.0        #两仪面相对太极面所转过角度（弧度）
+    Ga=0.0    #在两仪面上从零极轴转到给定点与球心的连线，球径所扫过的角度γ（弧度）
+    __rem=math.pi/4  #中间临时变量：θ或ψ对2π取余得到的数值
+    def __init__(self,Stheta,Spsi,k_int=10):
+        self.Theta=Stheta   #θ角赋值
+        self.Psi=Spsi    #ψ角赋值
+        self.k=k_int  #数字科学表示法中e-不小于k整数即视为极小值
+    def __Regression_region_absPI(self):
+        '''
+        对输入的弧度值进行转换，等价转换到(-π,π]范围内
+        '''
+        #第一步转换到（-2π,2π）范围内
+        if self.Radian_in>=0:
+            Radian_out=math.fmod(self.Radian_in,2*math.pi)
+        else:
+            Radian_out=math.fmod(self.Radian_in,-2*math.pi)
+        #第二步转换到(-π,π]范围内。
+        if Radian_out>math.pi:  #大于π，在太极面阴侧或虚面负侧，Radian_out角取负值
+            Radian_out=Radian_out-2*math.pi
+        elif Radian_out<=-math.pi:  #小于-π，在太极面阳侧或虚面正侧，Radian_out角取正值
+            Radian_out=Radian_out+2*math.pi
+        else: #在-π和π之间，不用处理
+            pass
+        return Radian_out
+    
+    def JingWei_Transform(self):
+        '''
+        此函数对经纬面角坐标[θ,ψ,0]中的角度等价转化到对应的主值。
+        旋转球极坐标系中坐标映射到：θ∈(-π,π], ψ∈(-π/2,π/2]范围内，
+        其中(θ,ψ)与(θ+π,π-ψ)坐标等价。返回经纬面角坐标对应主值[arg_θ,arg_ψ]
+        '''
+        #下面对θ角进行处理，使θ∈(-π,π]
+        self.Radian_in=self.Theta
+        self.arg_Theta=self.__Regression_region_absPI()
+        #下面对ψ角进行处理，使ψ∈(-π,π]
+        self.Radian_in=self.Psi
+        self.arg_Psi=self.__Regression_region_absPI()
+        
+        if self.arg_Psi>=-math.pi/2 and self.arg_Psi<=math.pi/2:
+            pass
+        else :
+            #坐标等价转换
+            self.arg_Theta=self.arg_Theta+math.pi
+            X=math.pi-math.abs(self.arg_Psi)
+            self.arg_Psi=math.copysign(X, self.arg_Psi)  #将ψ转化到(-π/2，0)或(0,π/2)范围内
+            
+            #下面将θ'值等价转换到(-π,π]范围内
+            self.Radian_in=self.arg_Theta
+            self.arg_Theta=self.__Regression_region_absPI()
+
+        #下面返回经纬面角坐标主值
+        return self.arg_Theta,self.arg_Psi
+
+    def __InfiniteSmall_Float(self):
+        '''
+        判断是否是一个极限小值浮点数的科学表示法
+        输入要处理的数和极限小值的负整数
+        如果幂函数小于e-10（即余数极限小），返回0，否则返回原值
+        '''
+        str1=str(self.__rem)
+        if 'e' in list(str1):   #如果系统是以小写e幂函数表示的浮点数
+            #---判断是否是一个极限小值浮点数的科学表示法-----
+            A=str1[-5:]
+            f=A.index('e')+1
+            k=int(A[f:])  #--取e后面的整数---
+            if k<0:  #如果为负整数
+                if abs(k)>=self.k:   #---满足极限小返回零值---
+                    y_r=0.0
+                else:   #--不满足极限小返回原值---
+                    y_r=self.__rem
+            else:  #如果为正整数返回原值
+                y_r=self.__rem
+
+        elif 'E' in list(str1):   #如果系统是以小写e幂函数表示的浮点数
+            A=str1[-5:]
+            f=A.index('E')+1
+            k=int(A[f:])  #--取E后面的整数---
+            if k<0:  #如果为负整数
+                if abs(k)>=self.k:   #---满足极限小返回零值---
+                    y_r=0.0
+                else:   #--不满足极限小返回原值---
+                    y_r=self.__rem
+            else:   #如果为正整数返回原值
+                y_r=self.__rem
+
+        else:  #如果一般不带e幂函数的浮点数返回原值
+            y_r=self.__rem
+        return y_r
+
+    def __Simplify_prinValue(self):
+        '''
+        下面先进行数据整理，将θ和ψ值转化到其主值范围
+        返回对θ和ψ的主值的简化,特别对近似零值进行取整零换算。
+        '''
+        Arg=self.JingWei_Transform()   #旋转球极坐标等价转化，转化到θ∈[-π,π],ψ∈[-π/2,π/2]
+        #其中Arg[0]为θ角主值，Arg[1]为ψ角主值
+        ys=[0.0,0.0]  #记录最终输出值
+        for i in range(2):
+            if Arg[i]==0.0:
+                ys[i]=0.0
+            elif Arg[i]>0.0:
+                self.__rem=Arg[i]
+                if self.__InfiniteSmall_Float()==0.0:   #返回值为0
+                    ys[i]=0.0
+                else:
+                    ys[i]=Arg[i]   #非零返回原值
+            else:
+                 self.__rem=Arg[i]
+                 if self.__InfiniteSmall_Float()==0.0:  #取余为零值判断真
+                     ys[i]=0.0
+                 else:
+                     ys[i]=Arg[i]   #非零返回原值
+        #返回θ和ψ主值
+        return ys[0],ys[1]
+
+    def Rotation_angle(self):
+        '''
+        此函数用来计算两仪面相对于太极面的阳侧所转过角度，单位为弧度
+        设两面A-SO-K夹角为|A|,那么A=arcsin(sinψ/sqrt(sinψ^2+cosψ^2*sin0^2))
+        两仪面转角A的正负与0，ψ主值乘积的符号一致.取值范围A∈(-π/2,π/2]
+        '''
+
+        theta0,psi0=self.__Simplify_prinValue()
+        if psi0==0 and theta0==0:
+        #--------=错误输入即θ=0，ψ=0=--------#
+            self.Da=math.nan
+        elif psi0==0 and theta0!=0:
+            '''--------=θ角主值不为零，ψ角主值为零=--------#
+            #两仪面与原太极面重合#
+            '''
+            self.Da=0.0
+        elif theta0==0 and psi0!=0:
+            '''
+            #--------=θ角主值为零，ψ角主值不为零=----------#
+            #两仪面经过零极轴垂直于太极面
+            '''
+            self.Da=math.pi/2
+        else:  #θ角主值不为零，ψ角主值不为零
+            if math.isclose(theta0,math.pi,rel_tol=1e-10):
+                '''  #θ角主值为π两仪面经过零极轴反向延长线垂直于太极面'''
+                self.Da=math.pi/2
+            else:
+                Tx=pow(math.sin(self.Psi),2)+pow(math.cos(self.Psi),2)*pow(math.sin(self.Theta),2)
+                T=math.asin(math.sin(self.Psi)/math.sqrt(Tx))
+                Sg=theta0*psi0  #两仪面转角A的正负与0，ψ主值乘积的符号一致
+                self.Da=math.copysign(T,Sg)   #返回T,并带有Sg的符号位 
+
+        return self.Da
+
+    def Gamma_angle(self):
+        '''
+        此函数用来计算从零极轴转到给定点与球心连线所扫过的夹角(弧度)
+        其正负号方向遵循右手原则：γ=arccos(cosθcosψ)，γ角正负由θ主值符号决定
+        '''
+        theta0,psi0=self.__Simplify_prinValue()
+        if psi0==0 and theta0==0:
+            #--------=θ和ψ主值角同时为零，γ角为零=----------#
+            self.Ga=0.0
+        elif theta0==0 and psi0!=0:
+            self.Ga=psi0
+            
+        elif psi0==0 and theta0!=0:
+            self.Ga=theta0
+        else:  #θ和ψ都不为0
+            if math.isclose(theta0,math.pi,rel_tol=1e-10):
+                #----#θ角主值为π时，γ角与ψ角互补#-----
+                self.Ga=math.copysign(math.pi-math.fabs(psi0),psi0)
+                
+            else:
+                x=math.cos(self.Theta)*math.cos(self.Psi)
+                self.Ga=math.copysign(math.acos(x),theta0)   #γ角正负由θ主值符号决定
+
+        return self.Ga
+    
+def Create(pos):  
+    '''
+    pos球极坐标系中的点坐标，形如([θ,ψ],0)最后0是类别号
+    θ为太极面上角分量,ψ为半虚面上的角分量，角度为弧度值
+    '''
+    if len(pos)==2 and pos[1]==0:
+        X=Complex_SPC(pos[0][0],pos[0][1])
+        Da=X.Rotation_angle()
+        if Da==math.nan:
+            raise ValueError("输入值错误，θ,ψ不能同时为零!")
+        Ga=X.Gamma_angle()
+    elif len(pos)!=2:
+        raise ValueError("数据格式输入错误，必须为([θ,ψ],0)格式数据!")
+    else:
+        raise ValueError("数据类型号输入错误，最后数据类别要为0!")
+
+    return Da,Ga
+
+def Convert_decare2cspc(x,y,z):
+    '''
+    此函数作用是将笛卡尔坐标系转换为旋转球极坐标系
+    输入参数：笛卡尔坐标系x,y,z值
+    返回值：旋转球极坐标系的经纬度角坐标和球径标量
+    '''
+    Z1=complex(x,y)
+    r1,Theta=cmath.polar(Z1)
+    Z2=complex(r1,z)
+    R,Psi=cmath.polar(Z2)
+    return Theta,Psi,R
+    
+def Convert_cspc2decare(Theta,Psi,R):
+    '''
+    此函数作用是将经纬度角坐标转换为笛卡尔三维坐标(即旋转球极坐标与笛卡尔坐标系之间转换)。
+    输入参数：旋转球极坐标系的经纬度角坐标和球径标量。
+    返回值：笛卡尔坐标系x,y,z值。
+    '''
+    Z=R*math.sin(Psi)
+    X=R*math.cos(Psi)*math.cos(Theta)
+    Y=R*math.cos(Psi)*math.sin(Theta)
+    return X,Y,Z
+
+
+def dist(Dot1,Dot2):
+    '''
+    此函数的作用是在旋转球极坐标系中计算两点的直线距离
+    输入参数：两个点的方位坐标，形式为点坐标P:[[θ,ψ,0],r]-->[([θ,ψ],0),r]  或者[[ε,ω,1],r]-->[([ε,ω],1),r]
+    返回两个点之间的直线距离
+    '''
+    r1,r2=Dot1[1],Dot2[1]
+    P1_spc=smath.Point_SPC(Dot1[0][0][0],Dot1[0][0][1],Dot1[0][1])
+    P2_spc=smath.Point_SPC(Dot2[0][0][0],Dot2[0][0][1],Dot2[0][1])
+    F=P1_spc+P2_spc
+    #根据余弦定理得,点1、点2与球心组成一个三角形，点1与点2连线对应夹角为F[1][0]
+    AB=math.sqrt(math.pow(r1, 2)+math.pow(r2, 2)-2*r1*r2*math.cos(F[1][0]))
+    return AB
