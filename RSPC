@@ -1,0 +1,83 @@
+# -*- coding: utf-8 -*-
+"""
+函数说明：此为两仪面角坐标转换函数集(旋转球极坐标系)
+作者：聂贻孝
+版本：V1.1
+日期: 2022-9-5
+"""
+import math
+
+def Coord_Trans_Epslon(eps_in):
+    '''
+    对两仪面角坐标([ε,ω],1)的ε进行转化
+    球极坐标系坐标等价转换：ε1∈(-π，π]等价转化到ε2∈(-π/2，π/2]
+    '''
+    Eps=eps_in
+    #下面对ε值等价转换到（-π,π]范围内的值
+    if -math.pi < Eps <= math.pi:
+            
+        #下面是对ε值进行等价转化
+        if math.isclose(Eps,math.pi,rel_tol=1e-10): #ε2=π
+            Eps=0
+        elif math.isclose(math.fabs(Eps),math.pi/2,rel_tol=1e-10): #ε2=-π/2或π/2
+            Eps=math.pi/2
+        elif math.fabs(Eps)>math.pi/2: #ε2∈(-π，π/2)或ε2∈(π/2，π)
+            y=math.pi-math.fabs(Eps)
+            Eps=math.copysign(y, -Eps)
+        else: #ε2∈(-π/2，π/2),.返回原值
+            pass
+    else:
+        Eps=math.nan
+        raise ValueError("ε输入值不合法，应在(-π，π]范围内!")
+        
+    return Eps
+
+def Coord_Trans_Omega(omg_in):
+    '''
+    对两仪面角坐标([ε,ω],1)的ω进行转化
+    球极坐标系坐标等价转换：先转化到ω∈(-2π,2π]，然后等价转化到（-π,π]范围内
+    返回ω主值范围数值
+    '''
+    Omg=omg_in
+    if math.isclose(math.fabs(Omg),2*math.pi,rel_tol=1e-10):
+            Omg=0.0
+    elif -2*math.pi < Omg < 2*math.pi:
+        #下面是对ω值进行等价转化
+        if math.isclose(Omg,0.0,rel_tol=1e-10) :
+            Omg=0.0
+        elif math.isclose(Omg,-math.pi,rel_tol=1e-10):
+            Omg=math.pi
+        elif math.fabs(Omg)>math.pi:
+            x=2*math.pi-math.fabs(Omg)
+            Omg=math.copysign(x,-Omg)
+        else:
+            pass
+    else:
+        raise ValueError("ω输入值不合法，应在(-2π,2π)范围内!")
+        Omg=math.nan
+    return Omg
+
+def LiangYi_Create(LY_cs):
+    '''
+    输入参数为([ε,ω],1)形式的有序数组
+    将输入数组转化到主值范围内ε∈(-π/2，π/2]，ω∈（-π,π]
+    '''
+    sg=LY_cs[1]
+    #下面对输入的LY_cs一维数组进行预处理
+    if sg==1:
+        Arg=[LY_cs[0][0],LY_cs[0][1]]
+        for i in range(2):
+            #下面对ε(Arg[0])，ω(Arg[1])值等价转换到（-2π,2π）范围内的值
+            if Arg[i]>=0:
+                Arg[i]=math.fmod(Arg[i], 2*math.pi)
+            else:
+                Arg[i]=math.fmod(Arg[i], -2*math.pi)
+        #下面将ε(Arg[0])，ω(Arg[1])转化到其主值范围内ε∈（-π/2，π/2]，ω∈（-π,π]
+        Arg_Eps=Coord_Trans_Epslon(Arg[0])
+        Arg_Omg=Coord_Trans_Omega(Arg[1])
+        
+    else:
+        Arg_Eps=math.nan
+        Arg_Omg=math.nan
+        raise ValueError("数据类型错误，应输入两仪面角坐标按([ε,ω],1)格式！")
+    return Arg_Eps,Arg_Omg
